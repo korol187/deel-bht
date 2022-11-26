@@ -1,0 +1,14 @@
+version: '3.8'
+services:
+  bht-service:
+      build:
+        context: .
+        dockerfile: Dockerfile
+      container_name: bht-service
+      image: bht-service
+      ports:
+        - "3001:3001"
+      volumes:
+        - ./src:/opt/app/src
+      command: sh -c 'npm run start'
+  
