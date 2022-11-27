@@ -71,7 +71,7 @@ app.get('/contracts/:id', getProfile, async (req, res) => {
  app.get('/jobs/unpaid', getProfile, async (req, res) => {
     const {Job, Contract} = req.app.get('models');
     const profileId = req.get('profile_id') || 0;
-    const contracts = await Job.findAll({
+    const jobs = await Job.findAll({
         where: {
             paid : {[Op.not]: true}
         },
@@ -84,32 +84,85 @@ app.get('/contracts/:id', getProfile, async (req, res) => {
             attributes:[]
         }],
     });
-    res.json(contracts);
+    res.json(jobs);
 })
 
 
 /**
- * @returns 
- * Pay for a job, a client can only pay if his balance >= the amount to pay. The amount should be moved from the client's balance to the contractor balance.
+ * @returns job after payment, a client can only pay if his balance >= the amount to pay. The amount should be moved from the client's balance to the contractor balance.
  */
 
 app.post('/jobs/:job_id/pay', getProfile, async (req, res) => {
-    const {Job, Contract} = req.app.get('models');
-    const profileId = req.get('profile_id') || 0;
-    const contracts = await Job.findAll({
-        where: {
-            paid : {[Op.not]: true}
-        },
-        include: [{ 
-            model: Contract, 
-            where: {
-                status : {[Op.ne]: 'terminated' },
-                [Op.or]: [{ ClientId: profileId }, { ContractorId: profileId }]
-            }, 
-            attributes:[]
-        }],
-    });
-    res.json(contracts);
+
+    try {
+        const result = await sequelize.transaction(async (t) => {
+
+            const {Job, Contract, Profile} = req.app.get('models');
+            const profileId = req.get('profile_id') || 0;
+            const {job_id} = req.params;
+
+
+
+            const client = await Profile.findOne({
+                where: {
+                    id : profileId,
+                    type : {[Op.eq]: 'client' },
+                },
+            }, { transaction: t });
+            if (!client) {
+                return res.status(403).send({ message: 'Only for clients' });
+            };
+
+
+
+            const job = await Job.findOne({
+                where: {
+                    id : job_id,
+                    paid : {[Op.not]: true}
+                },
+                include: [{ 
+                    model: Contract, 
+                    where: {
+                        status : {[Op.ne]: 'terminated' }
+                    }, 
+                    attributes:['ContractorId']
+                }],
+            }, { transaction: t });
+            if (!job) {
+                return res.status(404).send({ message: 'No matching jobs'});
+            };
+
+
+
+            if (client.balance <= job.price) {
+                return res.status(403).send({ message: 'Not enough money on balance'});
+            }
+
+
+
+            const contractorId = job.Contract.ContractorId;
+            const contractor = await Profile.findOne({
+                where: { id : contractorId }
+            });
+
+            const newClientBalance = client.balance - job.price;
+            await client.update({ balance: newClientBalance }, { transaction: t });
+
+            const newContractorBalance = contractor.balance + job.price;
+            await contractor.update({ balance: newContractorBalance }, { transaction: t });
+
+            await job.update({ paid: true }, { transaction: t });
+            return job;
+
+        });
+
+        res.json(result);
+
+
+    } catch (error) {
+        console.error('transaction erroe', error);
+        return res.status(500).send({ message: '500 Internal Server Error '});
+    }
 })
 
 
