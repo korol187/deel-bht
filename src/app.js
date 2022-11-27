@@ -166,5 +166,15 @@ app.post('/jobs/:job_id/pay', getProfile, async (req, res) => {
 })
 
 
+/**
+ * @returns Transaction status after deposits money into the the the balance of a client, a client can't deposit more than 25% his total of jobs to pay. (at the deposit moment)
+ */
+
+// TODO: Sorry, but I didn't understand the endpoint logic. Need clarification from the business.
+app.post('/balances/deposit/:userId', getProfile, async (req, res) => {
+    res.json('TBD');
+})
+
+
 
 module.exports = app;
