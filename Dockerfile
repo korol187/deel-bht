@@ -18,4 +18,6 @@ COPY ./database.sqlite3 ./database.sqlite3
 COPY ./src ./src
 
 EXPOSE 3001
+
+# TODO: Do we need run seeds separately ?S
 CMD [ "npm", "run", "seed" ]
