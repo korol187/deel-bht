@@ -6,6 +6,7 @@ const {sequelize} = require('./model');
 const {getProfile} = require('./middleware/getProfile');
 const app = express();
 const { Op } = require('sequelize');
+const e = require('express');
 
 app.use(bodyParser.json());
 app.set('sequelize', sequelize);
@@ -101,8 +102,6 @@ app.post('/jobs/:job_id/pay', getProfile, async (req, res) => {
             const profileId = req.get('profile_id') || 0;
             const {job_id} = req.params;
 
-
-
             const client = await Profile.findOne({
                 where: {
                     id : profileId,
@@ -112,7 +111,6 @@ app.post('/jobs/:job_id/pay', getProfile, async (req, res) => {
             if (!client) {
                 return res.status(403).send({ message: 'Only for clients' });
             };
-
 
 
             const job = await Job.findOne({
@@ -131,7 +129,6 @@ app.post('/jobs/:job_id/pay', getProfile, async (req, res) => {
             if (!job) {
                 return res.status(404).send({ message: 'No matching jobs'});
             };
-
 
 
             if (client.balance <= job.price) {
@@ -175,6 +172,73 @@ app.post('/balances/deposit/:userId', getProfile, async (req, res) => {
     res.json('TBD');
 })
 
+
+
+/**
+ * @returns Returns the profession that earned the most money (sum of jobs paid) for any contactor that worked in the query time range. Params: start=<date>&end=<date>
+ */
+
+app.get('/admin/best-profession', getProfile, async (req, res) => {
+
+    // TODO: Need some check for admin status!
+
+    const { start, end } = req.query;
+
+    let startDay, endDay;
+    try {
+        startDay = start ? new Date(start) : new Date(0);
+        endDay = end ? new Date(end) : new Date();
+
+        if(!(startDay instanceof Date && !isNaN(startDay)) || !(endDay instanceof Date && !isNaN(endDay))) {
+            throw Error('Wrong date format');
+        }
+
+    } catch(e) {
+        return res.status(400).send({ message: 'Wrong date format'});
+    }
+
+    // TODO: it is not entirely clear, should we take data regarding what job or something else? need to clarify
+
+    const {Job, Contract} = req.app.get('models');
+    const jobs = await Job.findAll({
+        where: {
+            paid : {[Op.eq]: true},
+            createdAt: {[Op.between]: [startDay, endDay]}
+        },
+        attributes:['price'],
+        include: [{ 
+            model: Contract,
+            attributes:['id'],
+            include: [
+                {
+                    association: 'Contractor', 
+                    attributes:['profession']
+                }
+            ],
+        }],
+    });
+
+    const professionPayments = jobs.reduce((accum, current) => {
+        const key = current.Contract.Contractor.profession;
+        const prevValue = accum[key] || 0;
+        accum[key] = prevValue + current.price;
+        return accum;
+      }, {});
+
+      const biggestPayments = Math.max(...Object.values(professionPayments));
+      const richestProfessions = Object.keys(professionPayments).filter(key => professionPayments[key] === biggestPayments);
+
+      console.log(richestProfessions);
+
+      let message;
+      if (richestProfessions.length > 1) {
+        message = 'The richest professions are: ' + richestProfessions.join() + '!';
+      } else {
+        message = 'The richest profession is: ' + richestProfessions[0] + '!';
+      }
+
+    res.json(message);
+})
 
 
 module.exports = app;
