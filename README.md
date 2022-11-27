@@ -1,6 +1,22 @@
+# What was done
+### Main
+All but two endpoints were created.
+Comments are left with reasons
+
+### Additional
+In order not to have problems with the compatibility of versions - the entire project was wrapped in docker.
+now the developer only needs to have it installed and all developers can work in the same environment
+
+### Possible next steps
+If there is more time, we should refactor the app file, move the logic to separate services and methods, write unit tests, preferably switch to typescript
+
+### Final
+In terms of limited time and new tools, this is the best thing I managed to do =)
+
+# ------------------------------------------------------------------------------------------
+
 # DEEL BACKEND TASK
 
-  
 
 💫 Welcome! 🎉
 
